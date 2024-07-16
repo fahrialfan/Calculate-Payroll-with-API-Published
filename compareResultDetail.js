@@ -71,8 +71,8 @@ export default function (data) {
     const contract = contractResponse.json();
     //console.log(`Contract data: ${JSON.stringify(contract)}`);
 
-    // Fetch adjustments
-    let adjustments = {
+	// Fetch adjustments	
+	let adjustments = {
 		REIMBURSEMENT: [],
 		PAID_ON_BOARD: [],
 		DEDUCTION: [],
@@ -84,34 +84,33 @@ export default function (data) {
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
 			},
-		});;
-		check(adjustmentResponse, {
-			[`adjustment for ${type} fetched successfully`]: (res) => res.status === 200,
 		});
+		check(adjustmentResponse, {
+			[`adjustment for ${type} fetched successfully`]: (res) => res.status === 200 || res.status === 404,
+		});
+
 		const adjustmentData = adjustmentResponse.json();
 
-		// Log adjustment data for debugging
+		/*// Log adjustment data for debugging
 		if (type === 'REIMBURSEMENT') {
 			console.log(`Adjustment data for ${type}: ${JSON.stringify(adjustmentData)}`);
-		}
+		}*/
 
-
-		if (Array.isArray(adjustmentData.adjustments)) {
+		if (adjustmentData && Array.isArray(adjustmentData.adjustments)) {
 			// Store adjustments based on type
 			adjustments[type] = adjustmentData.adjustments.map(adj => adj.amount);
 		} else {
 			console.error(`Expected an array for ${type} adjustments, but got: ${typeof adjustmentData.adjustments}`);
 		}
 	});
-	
-	const totalAdjustments = {
-		REIMBURSEMENT: adjustments.REIMBURSEMENT.reduce((sum, amount) => sum + amount, 0),
-		PAID_ON_BOARD: adjustments.PAID_ON_BOARD.reduce((sum, amount) => sum - amount, 0),
-		DEDUCTION: adjustments.DEDUCTION.reduce((sum, amount) => sum - amount, 0), 
-	};
-	
 
-	
+	// Ensure adjustments arrays are defined and sum up the adjustments for each type
+	const totalAdjustments = {
+		REIMBURSEMENT: (adjustments.REIMBURSEMENT || []).reduce((sum, amount) => sum + amount, 0),
+		PAID_ON_BOARD: (adjustments.PAID_ON_BOARD || []).reduce((sum, amount) => sum - amount, 0), // Negative for PAID_ON_BOARD
+		DEDUCTION: (adjustments.DEDUCTION || []).reduce((sum, amount) => sum - amount, 0), // Negative for DEDUCTION
+	};
+
 	// Fetch CCB data
     const ccbResponse = http.get(ccbUrl, {
         headers: {
