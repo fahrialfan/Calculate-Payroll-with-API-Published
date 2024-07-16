@@ -35,18 +35,19 @@ export default function (data) {
 	const ccbUrl = `${baseUrl}/v1/company/payroll/vessel/${vesselId}/crew/${companyCrewId}/payslip/ccb?year=${year}&month=${month}&purpose=${purpose}`;
 	
     
-    // Fetch payslip info
-    const payslipInfoResponse = http.get(payslipInfoUrl, {
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
-        },
-    });
-    check(payslipInfoResponse, {
-        'payslip info fetched successfully': (res) => res.status === 200,
-    });
+	// Fetch payslip info
+	const payslipInfoResponse = http.get(payslipInfoUrl, {
+		headers: {
+			Authorization: `Bearer ${accessToken}`,
+		},
+	});
+	check(payslipInfoResponse, {
+		'payslip info fetched successfully': (res) => res.status === 200,
+	});
 
-    const payslipInfo = payslipInfoResponse.json();
-
+	const payslipInfo = payslipInfoResponse.json();
+	//console.log('Payslip Info:', payslipInfo); // Log the entire payslip info for debugging
+	
     // Fetch contract details
     const contractResponse = http.get(contractUrl, {
         headers: {
@@ -72,39 +73,44 @@ export default function (data) {
 
     // Fetch adjustments
     let adjustments = {
-        REIMBURSEMENT: 0,
-        PAID_ON_BOARD: 0,
-        DEDUCTION: 0,
-    };
+		REIMBURSEMENT: [],
+		PAID_ON_BOARD: [],
+		DEDUCTION: [],
+	};
 
-   types.forEach(type => {
+	types.forEach(type => {
 		const adjustmentUrl = `${baseUrl}/v1/company/payroll/vessel/${vesselId}/crew/${companyCrewId}/payslip/adjustment?year=${year}&month=${month}&type=${type}`;
 		const adjustmentResponse = http.get(adjustmentUrl, {
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
 			},
-		});
+		});;
 		check(adjustmentResponse, {
 			[`adjustment for ${type} fetched successfully`]: (res) => res.status === 200,
 		});
 		const adjustmentData = adjustmentResponse.json();
 
 		// Log adjustment data for debugging
-		// console.log(`Adjustment data for ${type}: ${JSON.stringify(adjustmentData)}`);
+		if (type === 'REIMBURSEMENT') {
+			console.log(`Adjustment data for ${type}: ${JSON.stringify(adjustmentData)}`);
+		}
+
 
 		if (Array.isArray(adjustmentData.adjustments)) {
-			// Sum up adjustments based on type
-			adjustments[type] = adjustmentData.adjustments.reduce((sum, adj) => {
-				if (type === 'DEDUCTION' || type === 'PAID_ON_BOARD') {
-					return sum - adj.amount; // Deductions and paid items are negative
-				} else {
-					return sum + adj.amount; // Other adjustments like REIMBURSEMENT are positive
-				}
-			}, 0);
+			// Store adjustments based on type
+			adjustments[type] = adjustmentData.adjustments.map(adj => adj.amount);
 		} else {
 			console.error(`Expected an array for ${type} adjustments, but got: ${typeof adjustmentData.adjustments}`);
 		}
 	});
+	
+	const totalAdjustments = {
+		REIMBURSEMENT: adjustments.REIMBURSEMENT.reduce((sum, amount) => sum + amount, 0),
+		PAID_ON_BOARD: adjustments.PAID_ON_BOARD.reduce((sum, amount) => sum - amount, 0),
+		DEDUCTION: adjustments.DEDUCTION.reduce((sum, amount) => sum - amount, 0), 
+	};
+	
+
 	
 	// Fetch CCB data
     const ccbResponse = http.get(ccbUrl, {
@@ -117,61 +123,58 @@ export default function (data) {
     });
 
     const ccbData = ccbResponse.json();
-	console.log('CCB Data:', ccbData);
+	//console.log('CCB Data:', ccbData);
     const ccbValue = ccbData.data.reduce((sum, item) => sum + item.calculation, 0);
-	console.log('CCB Value:', ccbValue);
+	//console.log('CCB Value:', ccbValue);
 
     // Extract contract fields
-    const basicSalary = contract.basicSalary;
-    const fixedOvertimeAllowance = contract.fixedOvertimeAllowance;
-    const leaveSalary = contract.leaveSalary;
-    const tradeAllowance = contract.tradeAllowance;
-    const administrationAndUniformAllowance = contract.administrationAndUniformAllowance;
-
+    const basicSalaryContract = contract.basicSalary;
+    const fixedOvertimeAllowanceContract = contract.fixedOvertimeAllowance;
+    const leaveSalaryContract = contract.leaveSalary;
+    const tradeAllowanceContract = contract.tradeAllowance;
+    const administrationAndUniformAllowanceContract = contract.administrationAndUniformAllowance;
+	const othersContract = contract.others;
+	const onBoardSalaryContract = basicSalaryContract + fixedOvertimeAllowanceContract + leaveSalaryContract + tradeAllowanceContract + administrationAndUniformAllowanceContract + othersContract;
+	
     // Extract payslip info fields
-    const { totalDaysOnboard, totalDaysInMonth, salaryThisMonth, adminAndUniformAllowance, adjustment } = payslipInfo.earning;
     const bpjsEmployeeOldAgeInsurance = bpjsData.bpjsEmployeeOldAgeInsurance || 0;
 	const bpjsEmployeePensionInsurance = bpjsData.bpjsEmployeePensionInsurance || 0;
-	const contractCompletionBonusRelease = ccbValue || 0;
 
     // Perform calculations
-    const onboardSalary = roundToTwo(salaryThisMonth); // Use salaryThisMonth directly
-    const overtimeAllowance = roundToTwo(fixedOvertimeAllowance);
-    const totalEarnings = roundToTwo(onboardSalary + overtimeAllowance + leaveSalary + tradeAllowance + administrationAndUniformAllowance + adjustments.REIMBURSEMENT + contractCompletionBonusRelease);
-
-    const totalDeduction = roundToTwo((adjustments.DEDUCTION || 0) + (adjustments.PAID_ON_BOARD || 0) - (bpjsEmployeeOldAgeInsurance || 0) - (bpjsEmployeePensionInsurance || 0));
-    const totalReceived = roundToTwo(totalEarnings + totalDeduction);
-
-    // Expected values from payslipInfo
-    const expectedOnboardSalary = roundToTwo(salaryThisMonth);
-    const expectedOvertimeAllowance = roundToTwo(payslipInfo.earning.overtimeAllowance);
-    const expectedLeaveSalary = roundToTwo(payslipInfo.earning.leaveSalary);
-    const expectedTradeAllowance = roundToTwo(payslipInfo.earning.tradeAllowance);
-    const expectedAdminAndUniformAllowance = roundToTwo(adminAndUniformAllowance);
-	const expectedContractCompletionBonusRelease = roundToTwo(contractCompletionBonusRelease);
-    const expectedAdjustment = roundToTwo(adjustment);
-    const expectedTotalEarnings = roundToTwo(payslipInfo.earning.totalEarnings);
-    const expectedDeductionAdjustment = roundToTwo(payslipInfo.deduction.deductionAdjustment || 0);
+    const onboardSalaryCalculated = roundToTwo((payslipInfo.earning.totalDaysOnboard * onBoardSalaryContract) / payslipInfo.earning.totalDaysInMonth);
+	
+	// Expected values
+    const expectedOnboardSalary = roundToTwo(onboardSalaryCalculated);
+    const expectedOvertimeAllowance = roundToTwo(fixedOvertimeAllowanceContract);
+    const expectedLeaveSalary = roundToTwo(leaveSalaryContract);
+    const expectedTradeAllowance = roundToTwo(tradeAllowanceContract);
+    const expectedAdminAndUniformAllowance = roundToTwo(administrationAndUniformAllowanceContract);
+	const expectedContractCompletionBonusRelease = roundToTwo(ccbValue);
+    const expectedAdjustment = roundToTwo(totalAdjustments.REIMBURSEMENT || 0);
+    const expectedTotalEarnings = roundToTwo(expectedOnboardSalary + expectedOvertimeAllowance + expectedLeaveSalary + expectedTradeAllowance + expectedAdminAndUniformAllowance + expectedContractCompletionBonusRelease + expectedAdjustment);
+    const expectedDeductionAdjustment = roundToTwo(totalAdjustments.DEDUCTION || 0);
+	const expectedPaidOnBoard = roundToTwo(totalAdjustments.PAID_ON_BOARD || 0);
     const expectedBpjsEmployeeOldAgeInsurance = roundToTwo(bpjsEmployeeOldAgeInsurance);
     const expectedBpjsEmployeePensionInsurance = roundToTwo(bpjsEmployeePensionInsurance);
-    const expectedTotalDeduction = roundToTwo(payslipInfo.deduction.totalDeduction || 0);
-    const expectedTotalReceived = roundToTwo(payslipInfo.totalReceived);
+    const expectedTotalDeduction = roundToTwo((expectedDeductionAdjustment || 0) + (expectedPaidOnBoard || 0) - (bpjsEmployeeOldAgeInsurance || 0) - (bpjsEmployeePensionInsurance || 0));
+    const expectedTotalReceived = roundToTwo(expectedTotalEarnings + expectedTotalDeduction);
 
     // Compare calculated and expected values
     const results = {
-        'onboardSalary is correct': onboardSalary === expectedOnboardSalary,
-        'overtimeAllowance is correct': overtimeAllowance === expectedOvertimeAllowance,
-        'leaveSalary is correct': roundToTwo(leaveSalary) === expectedLeaveSalary,
-        'tradeAllowance is correct': roundToTwo(tradeAllowance) === expectedTradeAllowance,
-        'administrationAndUniformAllowance is correct': roundToTwo(administrationAndUniformAllowance) === expectedAdminAndUniformAllowance,
-		'contractCompletionBonusRelease is correct' : roundToTwo(contractCompletionBonusRelease) === expectedContractCompletionBonusRelease,
-        'adjustment is correct': roundToTwo(adjustments.REIMBURSEMENT) === expectedAdjustment,
-        'totalEarnings is correct': totalEarnings === expectedTotalEarnings,
-        'deductionAdjustment is correct': roundToTwo(adjustments.DEDUCTION) === expectedDeductionAdjustment,
-        'bpjsEmployeeOldAgeInsurance is correct': roundToTwo(bpjsEmployeeOldAgeInsurance) === roundToTwo(payslipInfo.deduction.bpjsEmployeeOldAgeInsurance),
-		'bpjsEmployeePensionInsurance is correct': roundToTwo(bpjsEmployeePensionInsurance) === roundToTwo(payslipInfo.deduction.bpjsEmployeePensionInsurance),
-        'totalDeduction is correct': totalDeduction === expectedTotalDeduction,
-        'totalReceived is correct': totalReceived === expectedTotalReceived,
+        'onboardSalary is correct': roundToTwo(payslipInfo.earning.salaryThisMonth) === expectedOnboardSalary,
+        'overtimeAllowance is correct': roundToTwo(payslipInfo.earning.overtimeAllowance) === expectedOvertimeAllowance,
+        'leaveSalary is correct': roundToTwo(payslipInfo.earning.leaveSalary) === expectedLeaveSalary,
+        'tradeAllowance is correct': roundToTwo(payslipInfo.earning.tradeAllowance) === expectedTradeAllowance,
+        'administrationAndUniformAllowance is correct': roundToTwo(payslipInfo.earning.adminAndUniformAllowance) === expectedAdminAndUniformAllowance,
+		'contractCompletionBonusRelease is correct' : roundToTwo(payslipInfo.earning.contractCompletionBonusRelease) === expectedContractCompletionBonusRelease,
+        'adjustment is correct': roundToTwo(payslipInfo.earning.adjustment) === expectedAdjustment,
+        'totalEarnings is correct': roundToTwo(payslipInfo.earning.totalEarnings) === expectedTotalEarnings,
+        'deductionAdjustment is correct': roundToTwo(payslipInfo.deduction.deductionAdjustment) === expectedDeductionAdjustment,
+        'bpjsEmployeeOldAgeInsurance is correct': roundToTwo(payslipInfo.deduction.bpjsEmployeeOldAgeInsurance) ===  roundToTwo(bpjsEmployeeOldAgeInsurance),
+		'bpjsEmployeePensionInsurance is correct': roundToTwo(payslipInfo.deduction.bpjsEmployeePensionInsurance) ===  roundToTwo(bpjsEmployeePensionInsurance) ,
+		'paidOnBoard is correct':  roundToTwo(-payslipInfo.deduction.paidOnBoard) === roundToTwo(expectedPaidOnBoard),
+        'totalDeduction is correct': roundToTwo(payslipInfo.deduction.totalDeduction) === expectedTotalDeduction,
+        'totalReceived is correct': roundToTwo(payslipInfo.totalReceived) === expectedTotalReceived,
     };
 
     // Log the results
@@ -181,55 +184,59 @@ export default function (data) {
         switch (expectedKey) {
             case 'adjustment':
                 expectedValue = expectedAdjustment;
-                actualValue = roundToTwo(adjustments.REIMBURSEMENT);
+                actualValue = roundToTwo(payslipInfo.earning.adjustment);
                 break;
             case 'deductionAdjustment':
                 expectedValue = expectedDeductionAdjustment;
-                actualValue = roundToTwo(adjustments.DEDUCTION);
+                actualValue = roundToTwo(payslipInfo.deduction.deductionAdjustment);
                 break;
             case 'onboardSalary':
                 expectedValue = expectedOnboardSalary;
-                actualValue = onboardSalary;
+                actualValue = roundToTwo(payslipInfo.earning.salaryThisMonth);
                 break;
             case 'overtimeAllowance':
                 expectedValue = expectedOvertimeAllowance;
-                actualValue = overtimeAllowance;
+                actualValue = roundToTwo(payslipInfo.earning.overtimeAllowance);
                 break;
             case 'leaveSalary':
                 expectedValue = expectedLeaveSalary;
-                actualValue = roundToTwo(leaveSalary);
+                actualValue = roundToTwo(payslipInfo.earning.leaveSalary);
                 break;
             case 'tradeAllowance':
                 expectedValue = expectedTradeAllowance;
-                actualValue = roundToTwo(tradeAllowance);
+                actualValue = roundToTwo(payslipInfo.earning.tradeAllowance);
                 break;
             case 'administrationAndUniformAllowance':
                 expectedValue = expectedAdminAndUniformAllowance;
-                actualValue = roundToTwo(administrationAndUniformAllowance);
+                actualValue = roundToTwo(payslipInfo.earning.adminAndUniformAllowance);
                 break;
 			case 'contractCompletionBonusRelease':
 				expectedValue = expectedContractCompletionBonusRelease;
-                actualValue = roundToTwo(contractCompletionBonusRelease);
+                actualValue = roundToTwo(payslipInfo.earning.contractCompletionBonusRelease);
                 break;
             case 'totalEarnings':
                 expectedValue = expectedTotalEarnings;
-                actualValue = totalEarnings;
+                actualValue = roundToTwo(payslipInfo.earning.totalEarnings);
                 break;
             case 'bpjsEmployeeOldAgeInsurance':
                 expectedValue = expectedBpjsEmployeeOldAgeInsurance;
-                actualValue = roundToTwo(bpjsEmployeeOldAgeInsurance);
+                actualValue = roundToTwo(payslipInfo.deduction.bpjsEmployeeOldAgeInsurance);
                 break;
             case 'bpjsEmployeePensionInsurance':
                 expectedValue = expectedBpjsEmployeePensionInsurance;
-                actualValue = roundToTwo(bpjsEmployeePensionInsurance);
+                actualValue = roundToTwo(payslipInfo.deduction.bpjsEmployeePensionInsurance);
+                break;
+			case 'paidOnBoard':
+                expectedValue = roundToTwo(expectedPaidOnBoard);
+                actualValue = roundToTwo(payslipInfo.deduction.paidOnBoard);
                 break;
             case 'totalDeduction':
                 expectedValue = expectedTotalDeduction;
-                actualValue = totalDeduction;
+                actualValue = roundToTwo(payslipInfo.deduction.totalDeduction);
                 break;
             case 'totalReceived':
                 expectedValue = expectedTotalReceived;
-                actualValue = totalReceived;
+                actualValue = roundToTwo(payslipInfo.totalReceived);
                 break;
             default:
                 expectedValue = null;
@@ -253,6 +260,7 @@ export default function (data) {
         'deductionAdjustment is correct': (r) => r['deductionAdjustment is correct'],
         'bpjsEmployeeOldAgeInsurance is correct': (r) => r['bpjsEmployeeOldAgeInsurance is correct'],
         'bpjsEmployeePensionInsurance is correct': (r) => r['bpjsEmployeePensionInsurance is correct'],
+		'paidOnBoard is correct': (r) => r['paidOnBoard is correct'],
         'totalDeduction is correct': (r) => r['totalDeduction is correct'],
         'totalReceived is correct': (r) => r['totalReceived is correct'],
     });
