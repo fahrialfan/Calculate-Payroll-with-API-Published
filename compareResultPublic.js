@@ -17,8 +17,8 @@ export default function (data) {
     const accessToken = data.accessToken;
 
     // Parameters in API, fill according to your API
-    const companyCrewId = '123456-hjkasd-sss001-aa12-bb123';
-    const vesselId = '123456-hjkasd-sss001-aa12-bb123';
+    const employeeId = '123456-hjkasd-sss001-aa12-bb123';
+    const departmentId = '123456-hjkasd-sss001-aa12-bb123';
     const year = 2024;
     const month = 7;
     const rateCurrency = 16131.46594067;
@@ -27,8 +27,8 @@ export default function (data) {
 	const page= 1;
 
     // Construct the URL with the provided parameters
-    const payslipUrl = `${baseUrl}/company/payroll/vessel/${vesselId}/crew/payslip?year=${year}&month=${month}&page=${page}`;
-    const contractUrl = `${baseUrl}/v1/company/contract/${companyCrewId}`;
+    const payslipUrl = `${baseUrl}/payroll/${departmentId}/employee/payslip?year=${year}&month=${month}&page=${page}`;
+    const contractUrl = `${baseUrl}/contract/${employeeId}`;
 
     // Make the API call to get payslip pagination
     const payslipResponse = http.get(payslipUrl, {
@@ -67,9 +67,9 @@ export default function (data) {
 
     let matchingPayslipItem = null;
 	
-    // Iterate through the payslipData.items to find the matching item by companyCrewId
+    // Iterate through the payslipData.items to find the matching item by employeeId
     for (const item of payslipData.items) {
-        if (item.companyCrewId === companyCrewId) {
+        if (item.employeeId === employeeId) {
             matchingPayslipItem = item;
             break;
         }
@@ -90,37 +90,37 @@ export default function (data) {
         const salaryThisMonth = (onBoardSalary * totalDaysOnboard) / totalDaysInMonth;
         const standByAllowanceThisMonth = ((standByAllowance || 0) * totalDaysStandby) / totalDaysInMonth;
 
-        let bpjsCompanyOldAgeInsurance = 0;
-        let bpjsCompanyPensionInsurance = 0;
-        let bpjsCompanyDeathInsurance = 0;
-        let bpjsCompanyWorkAccidentInsurance = 0;
+        let bpjsDepartmentOldAgeInsurance = 0;
+        let bpjsDepartmentPensionInsurance = 0;
+        let bpjsDepartmentDeathInsurance = 0;
+        let bpjsDepartmentWorkAccidentInsurance = 0;
         let bpjsEmployeeOldAgeInsurance = 0;
         let bpjsEmployeePensionInsurance = 0;
 
         if (totalDaysOnboard === totalDaysInMonth) {
             if (rankLabel === 'Cadet') {
-                bpjsCompanyOldAgeInsurance = (basicSalary * (totalDaysOnboard / totalDaysInMonth)) * (0.02 + 0.037);
-                bpjsCompanyPensionInsurance = (0.02 + 0.037) * (totalDaysOnboard / totalDaysInMonth) * basicSalary;
+                bpjsDepartmentOldAgeInsurance = (basicSalary * (totalDaysOnboard / totalDaysInMonth)) * (0.02 + 0.037);
+                bpjsDepartmentPensionInsurance = (0.02 + 0.037) * (totalDaysOnboard / totalDaysInMonth) * basicSalary;
                 bpjsEmployeeOldAgeInsurance = 0;
                 bpjsEmployeePensionInsurance = 0;
             } else {
-                bpjsCompanyOldAgeInsurance = (basicSalary * (totalDaysOnboard / totalDaysInMonth)) * 0.037;
+                bpjsDepartmentOldAgeInsurance = (basicSalary * (totalDaysOnboard / totalDaysInMonth)) * 0.037;
                 if (age < 58) {
                     if ((basicSalary * totalDaysOnboard / totalDaysInMonth) >= 9559600) {
-                        bpjsCompanyPensionInsurance = 0.02 * totalDaysOnboard / totalDaysInMonth * 9559600;
+                        bpjsDepartmentPensionInsurance = 0.02 * totalDaysOnboard / totalDaysInMonth * 9559600;
                         bpjsEmployeePensionInsurance = 0.01 * totalDaysOnboard / totalDaysInMonth * 9559600;
                     } else {
-                        bpjsCompanyPensionInsurance = 0.02 * totalDaysOnboard / totalDaysInMonth * basicSalary;
+                        bpjsDepartmentPensionInsurance = 0.02 * totalDaysOnboard / totalDaysInMonth * basicSalary;
                         bpjsEmployeePensionInsurance = 0.01 * totalDaysOnboard / totalDaysInMonth * basicSalary;
                     }
                 } else {
-                    bpjsCompanyPensionInsurance = 0;
+                    bpjsDepartmentPensionInsurance = 0;
                     bpjsEmployeePensionInsurance = 0;
                 }
                 bpjsEmployeeOldAgeInsurance = basicSalary * (totalDaysOnboard / totalDaysInMonth) * 0.02;
             }
-            bpjsCompanyDeathInsurance = basicSalary * (totalDaysOnboard / totalDaysInMonth) * 0.003;
-            bpjsCompanyWorkAccidentInsurance = basicSalary * (totalDaysOnboard / totalDaysInMonth) * 0.0174;
+            bpjsDepartmentDeathInsurance = basicSalary * (totalDaysOnboard / totalDaysInMonth) * 0.003;
+            bpjsDepartmentWorkAccidentInsurance = basicSalary * (totalDaysOnboard / totalDaysInMonth) * 0.0174;
         }
 
         const paidThisMonthIDR = salaryThisMonth - ((paidOnBoard || 0) + bpjsEmployeeOldAgeInsurance + bpjsEmployeePensionInsurance) + adjustment + standByAllowanceThisMonth;
@@ -128,8 +128,8 @@ export default function (data) {
         const contractCompletionBonusHold = (contractCompletionBonus * totalDaysOnboard) / totalDaysInMonth;
         const totalActualSalaryIDR = salaryThisMonth + (adjustment || 0) + standByAllowanceThisMonth + contractCompletionBonusHold;
         const totalActualSalaryUSD = totalActualSalaryIDR / rateCurrency;
-        const bpjsCompanyTotalInsurance = bpjsCompanyOldAgeInsurance + bpjsCompanyPensionInsurance + bpjsCompanyDeathInsurance + bpjsCompanyWorkAccidentInsurance;
-        const bpjsTotalInsurance = bpjsCompanyTotalInsurance + bpjsEmployeeOldAgeInsurance + bpjsEmployeePensionInsurance;
+        const bpjsDepartmentTotalInsurance = bpjsDepartmentOldAgeInsurance + bpjsDepartmentPensionInsurance + bpjsDepartmentDeathInsurance + bpjsDepartmentWorkAccidentInsurance;
+        const bpjsTotalInsurance = bpjsDepartmentTotalInsurance + bpjsEmployeeOldAgeInsurance + bpjsEmployeePensionInsurance;
 
 
         const roundToTwo = num => Math.round(num * 100) / 100;
@@ -143,13 +143,13 @@ export default function (data) {
             'contractCompletionBonusHold is correct': roundToTwo(matchingPayslipItem.contractCompletionBonusHold) === roundToTwo(contractCompletionBonusHold),
             'totalActualSalaryIDR is correct': roundToTwo(matchingPayslipItem.totalActualSalaryIDR) === roundToTwo(totalActualSalaryIDR),
             'totalActualSalaryUSD is correct': roundToTwo(matchingPayslipItem.totalActualSalaryUSD) === roundToTwo(totalActualSalaryUSD),
-            'bpjsCompanyOldAgeInsurance is correct': roundToTwo(matchingPayslipItem.bpjsCompanyOldAgeInsurance) === roundToTwo(bpjsCompanyOldAgeInsurance),
-            'bpjsCompanyPensionInsurance is correct': roundToTwo(matchingPayslipItem.bpjsCompanyPensionInsurance) === roundToTwo(bpjsCompanyPensionInsurance),
-            'bpjsCompanyDeathInsurance is correct': roundToTwo(matchingPayslipItem.bpjsCompanyDeathInsurance) === roundToTwo(bpjsCompanyDeathInsurance),
-            'bpjsCompanyWorkAccidentInsurance is correct': roundToTwo(matchingPayslipItem.bpjsCompanyWorkAccidentInsurance) === roundToTwo(bpjsCompanyWorkAccidentInsurance),
+            'bpjsDepartmentOldAgeInsurance is correct': roundToTwo(matchingPayslipItem.bpjsDepartmentOldAgeInsurance) === roundToTwo(bpjsDepartmentOldAgeInsurance),
+            'bpjsDepartmentPensionInsurance is correct': roundToTwo(matchingPayslipItem.bpjsDepartmentPensionInsurance) === roundToTwo(bpjsDepartmentPensionInsurance),
+            'bpjsDepartmentDeathInsurance is correct': roundToTwo(matchingPayslipItem.bpjsDepartmentDeathInsurance) === roundToTwo(bpjsDepartmentDeathInsurance),
+            'bpjsDepartmentWorkAccidentInsurance is correct': roundToTwo(matchingPayslipItem.bpjsDepartmentWorkAccidentInsurance) === roundToTwo(bpjsDepartmentWorkAccidentInsurance),
             'bpjsEmployeeOldAgeInsurance is correct': roundToTwo(matchingPayslipItem.bpjsEmployeeOldAgeInsurance) === roundToTwo(bpjsEmployeeOldAgeInsurance),
             'bpjsEmployeePensionInsurance is correct': roundToTwo(matchingPayslipItem.bpjsEmployeePensionInsurance) === roundToTwo(bpjsEmployeePensionInsurance),
-            'bpjsCompanyTotalInsurance is correct': roundToTwo(matchingPayslipItem.bpjsCompanyTotalInsurance) === roundToTwo(bpjsCompanyTotalInsurance),
+            'bpjsDepartmentTotalInsurance is correct': roundToTwo(matchingPayslipItem.bpjsDepartmentTotalInsurance) === roundToTwo(bpjsDepartmentTotalInsurance),
             'bpjsTotalInsurance is correct': roundToTwo(matchingPayslipItem.bpjsTotalInsurance) === roundToTwo(bpjsTotalInsurance),
         };
 		
@@ -168,13 +168,13 @@ export default function (data) {
             'contractCompletionBonusHold is correct': (r) => r['contractCompletionBonusHold is correct'],
             'totalActualSalaryIDR is correct': (r) => r['totalActualSalaryIDR is correct'],
             'totalActualSalaryUSD is correct': (r) => r['totalActualSalaryUSD is correct'],
-            'bpjsCompanyOldAgeInsurance is correct': (r) => r['bpjsCompanyOldAgeInsurance is correct'],
-            'bpjsCompanyPensionInsurance is correct': (r) => r['bpjsCompanyPensionInsurance is correct'],
-            'bpjsCompanyDeathInsurance is correct': (r) => r['bpjsCompanyDeathInsurance is correct'],
-            'bpjsCompanyWorkAccidentInsurance is correct': (r) => r['bpjsCompanyWorkAccidentInsurance is correct'],
+            'bpjsDepartmentOldAgeInsurance is correct': (r) => r['bpjsDepartmentOldAgeInsurance is correct'],
+            'bpjsDepartmentPensionInsurance is correct': (r) => r['bpjsDepartmentPensionInsurance is correct'],
+            'bpjsDepartmentDeathInsurance is correct': (r) => r['bpjsDepartmentDeathInsurance is correct'],
+            'bpjsDepartmentWorkAccidentInsurance is correct': (r) => r['bpjsDepartmentWorkAccidentInsurance is correct'],
             'bpjsEmployeeOldAgeInsurance is correct': (r) => r['bpjsEmployeeOldAgeInsurance is correct'],
             'bpjsEmployeePensionInsurance is correct': (r) => r['bpjsEmployeePensionInsurance is correct'],
-            'bpjsCompanyTotalInsurance is correct': (r) => r['bpjsCompanyTotalInsurance is correct'],
+            'bpjsDepartmentTotalInsurance is correct': (r) => r['bpjsDepartmentTotalInsurance is correct'],
             'bpjsTotalInsurance is correct': (r) => r['bpjsTotalInsurance is correct'],
         });
     }
