@@ -24,7 +24,7 @@ export default function (data) {
     const rateCurrency = 16131.46594067;
     const totalDaysInMonth = 30;
     const age = 29;
-	const page= 1;
+    const page= 1;
 
     // Construct the URL with the provided parameters
     const payslipUrl = `${baseUrl}/payroll/${departmentId}/employee/payslip?year=${year}&month=${month}&page=${page}`;
