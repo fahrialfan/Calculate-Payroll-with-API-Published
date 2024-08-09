@@ -56,7 +56,7 @@ export default function (data) {
 
     // Extract necessary fields from contractData
     const {
-        basicSalary = 0,
+        basicSalary: rawBasicSalary = 0,
         fixedOvertimeAllowance = 0,
         leaveSalary = 0,
         administrationAndUniformAllowance = 0,
@@ -86,41 +86,43 @@ export default function (data) {
         } = matchingPayslipItem || {};
 
         // Calculate the expected values
-        const onBoardSalary = basicSalary + fixedOvertimeAllowance + leaveSalary + administrationAndUniformAllowance + tradeAllowance + others;
+        const onBoardSalary = rawBasicSalary + fixedOvertimeAllowance + leaveSalary + administrationAndUniformAllowance + tradeAllowance + others;
         const salaryThisMonth = (onBoardSalary * totalDaysOnboard) / totalDaysInMonth;
         const standByAllowanceThisMonth = ((standByAllowance || 0) * totalDaysStandby) / totalDaysInMonth;
+        // Ensure the basic salary is at least 4,641,854 for BPJS calculations
+        const basicSalaryForBPJS = rawBasicSalary < 4641854 ? 4641854 : rawBasicSalary;
 
-        let bpjsDepartmentOldAgeInsurance = 0;
-        let bpjsDepartmentPensionInsurance = 0;
-        let bpjsDepartmentDeathInsurance = 0;
-        let bpjsDepartmentWorkAccidentInsurance = 0;
+        let bpjsCompanyOldAgeInsurance = 0;
+        let bpjsCompanyPensionInsurance = 0;
+        let bpjsCompanyDeathInsurance = 0;
+        let bpjsCompanyWorkAccidentInsurance = 0;
         let bpjsEmployeeOldAgeInsurance = 0;
         let bpjsEmployeePensionInsurance = 0;
 
         if (totalDaysOnboard === totalDaysInMonth) {
             if (rankLabel === 'Cadet') {
-                bpjsDepartmentOldAgeInsurance = (basicSalary * (totalDaysOnboard / totalDaysInMonth)) * (0.02 + 0.037);
-                bpjsDepartmentPensionInsurance = (0.02 + 0.037) * (totalDaysOnboard / totalDaysInMonth) * basicSalary;
+                bpjsCompanyOldAgeInsurance = (basicSalaryForBPJS * (totalDaysOnboard / totalDaysInMonth)) * (0.02 + 0.037);
+                bpjsCompanyPensionInsurance = (0.02 + 0.037) * (totalDaysOnboard / totalDaysInMonth) * basicSalaryForBPJS;
                 bpjsEmployeeOldAgeInsurance = 0;
                 bpjsEmployeePensionInsurance = 0;
             } else {
-                bpjsDepartmentOldAgeInsurance = (basicSalary * (totalDaysOnboard / totalDaysInMonth)) * 0.037;
+                bpjsCompanyOldAgeInsurance = (basicSalaryForBPJS * (totalDaysOnboard / totalDaysInMonth)) * 0.037;
                 if (age < 58) {
-                    if ((basicSalary * totalDaysOnboard / totalDaysInMonth) >= 9559600) {
-                        bpjsDepartmentPensionInsurance = 0.02 * totalDaysOnboard / totalDaysInMonth * 9559600;
+                    if ((basicSalaryForBPJS * totalDaysOnboard / totalDaysInMonth) >= 9559600) {
+                        bpjsCompanyPensionInsurance = 0.02 * totalDaysOnboard / totalDaysInMonth * 9559600;
                         bpjsEmployeePensionInsurance = 0.01 * totalDaysOnboard / totalDaysInMonth * 9559600;
                     } else {
-                        bpjsDepartmentPensionInsurance = 0.02 * totalDaysOnboard / totalDaysInMonth * basicSalary;
-                        bpjsEmployeePensionInsurance = 0.01 * totalDaysOnboard / totalDaysInMonth * basicSalary;
+                        bpjsCompanyPensionInsurance = 0.02 * totalDaysOnboard / totalDaysInMonth * basicSalaryForBPJS;
+                        bpjsEmployeePensionInsurance = 0.01 * totalDaysOnboard / totalDaysInMonth * basicSalaryForBPJS;
                     }
                 } else {
-                    bpjsDepartmentPensionInsurance = 0;
+                    bpjsCompanyPensionInsurance = 0;
                     bpjsEmployeePensionInsurance = 0;
                 }
-                bpjsEmployeeOldAgeInsurance = basicSalary * (totalDaysOnboard / totalDaysInMonth) * 0.02;
+                bpjsEmployeeOldAgeInsurance = basicSalaryForBPJS * (totalDaysOnboard / totalDaysInMonth) * 0.02;
             }
-            bpjsDepartmentDeathInsurance = basicSalary * (totalDaysOnboard / totalDaysInMonth) * 0.003;
-            bpjsDepartmentWorkAccidentInsurance = basicSalary * (totalDaysOnboard / totalDaysInMonth) * 0.0174;
+            bpjsCompanyDeathInsurance = basicSalaryForBPJS * (totalDaysOnboard / totalDaysInMonth) * 0.003;
+            bpjsCompanyWorkAccidentInsurance = basicSalaryForBPJS * (totalDaysOnboard / totalDaysInMonth) * 0.0174;
         }
 
         const paidThisMonthIDR = salaryThisMonth - ((paidOnBoard || 0) + bpjsEmployeeOldAgeInsurance + bpjsEmployeePensionInsurance) + adjustment + standByAllowanceThisMonth;
@@ -128,8 +130,8 @@ export default function (data) {
         const contractCompletionBonusHold = (contractCompletionBonus * totalDaysOnboard) / totalDaysInMonth;
         const totalActualSalaryIDR = salaryThisMonth + (adjustment || 0) + standByAllowanceThisMonth + contractCompletionBonusHold;
         const totalActualSalaryUSD = totalActualSalaryIDR / rateCurrency;
-        const bpjsDepartmentTotalInsurance = bpjsDepartmentOldAgeInsurance + bpjsDepartmentPensionInsurance + bpjsDepartmentDeathInsurance + bpjsDepartmentWorkAccidentInsurance;
-        const bpjsTotalInsurance = bpjsDepartmentTotalInsurance + bpjsEmployeeOldAgeInsurance + bpjsEmployeePensionInsurance;
+        const bpjsCompanyTotalInsurance = bpjsCompanyOldAgeInsurance + bpjsCompanyPensionInsurance + bpjsCompanyDeathInsurance + bpjsCompanyWorkAccidentInsurance;
+        const bpjsTotalInsurance = bpjsCompanyTotalInsurance + bpjsEmployeeOldAgeInsurance + bpjsEmployeePensionInsurance;
 
 
         const roundToTwo = num => Math.round(num * 100) / 100;
